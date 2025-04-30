@@ -1,0 +1,8 @@
+{
+  "seraph-client-tags": {
+    "url": "https://api.seraph.si/private-access/client",
+    "querystring": {
+      "key": "Seraph API Key"
+    }
+  }
+}
