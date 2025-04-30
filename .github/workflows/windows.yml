@@ -1,20 +1,11 @@
-on:
-  push:
-    branches:
-      - '*'
+name: Build for Windows only
+
+on: [push]
+
 jobs:
   build:
-    name: Build
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        os: [ ubuntu-latest, windows-latest, macos-latest ]
-        goos: [ linux, windows, darwin ]
-        goarch: [ amd64 ]
-        extension:
-          - ""
-          - ".exe"
-          - ""
+    name: Build on Windows
+    runs-on: windows-latest
 
     steps:
       - name: Set up Go
@@ -32,17 +23,13 @@ jobs:
 
       - name: Build
         env:
-          GOOS: ${{ matrix.goos }}
-          GOARCH: ${{ matrix.goarch }}
+          GOOS: windows
+          GOARCH: amd64
           CGO_ENABLED: 0
         run: |
-          go build -v -o ${{ runner.os }}-${{ matrix.goos }}-${{ matrix.goarch }}/${{ github.name }}${{matrix.extension}} ./main.go
+          go build -v -o ${{ github.name }}.exe ./main.go
           mkdir dist
-          if ($env:RUNNER_OS -eq "Windows") {
-            7z a -r "dist/${{ github.name }}-${{ matrix.goos }}-${{ matrix.goarch }}.zip" "dist/*"
-          } else {
-            tar -czvf "dist/${{ github.name }}-${{ matrix.goos }}-${{ matrix.goarch }}.tar.gz"  "${{ runner.os }}"
-          }
+          Move-Item ./${{ github.name }}.exe ./dist/
       - name: Create Release
         id: create_release
         uses: actions/create-release@v1
@@ -60,6 +47,6 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: dist/*
-          asset_name: ${{ github.name }}-${{ matrix.os }}-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.extension }}.${{ matrix.extension }}
+          asset_path: dist/${{ github.name }}.exe
+          asset_name: ${{ github.name }}.exe
           asset_content_type: application/octet-stream
