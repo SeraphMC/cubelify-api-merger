@@ -1,4 +1,4 @@
-module untitled
+module seraph.si/v2/api-merger
 
 go 1.24
 
