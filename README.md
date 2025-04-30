@@ -6,6 +6,12 @@ This application merges responses from multiple Cubelify formatted APIs into a s
 
 The application's behaviour is configured using a JSON file (e.g., `config.json`). This file defines the API endpoints to be called and how their responses should be handled. A working configuration is included in the project repository under "config.json".
 
+In the Cubelify overlay, simply paste this line in to your Custom API URL:
+
+```text
+http://localhost:3000/merger?source={{source}}
+```
+
 ### `config.json` Structure
 
 The `config.json` file contains a JSON object where each key represents a custom name for an API configuration.  Each of these configurations is an object with the following structure:
