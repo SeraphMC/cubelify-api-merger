@@ -1,20 +1,23 @@
 name: Build and Release
 
-on: [ push ]
-
+on:
+  push:
+    branches:
+      - '*'
 jobs:
   build:
-    name: Build on ${{ matrix.os }}
+    name: Build
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ ubuntu-latest, windows-latest, macos-latest ]
-        goos: [ linux, windows, darwin ]
-        goarch: [ amd64 ]
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        goos: [linux, windows, darwin]
+        goarch: [amd64]
         extension:
           - ""
           - ".exe"
           - ""
+
     steps:
       - name: Set up Go
         uses: actions/setup-go@v4
@@ -38,9 +41,9 @@ jobs:
           go build -v -o ${{ runner.os }}-${{ matrix.goos }}-${{ matrix.goarch }}/${{ github.name }}${{matrix.extension}} ./...
           mkdir dist
           if ($env:RUNNER_OS -eq "Windows") {
-            7z a -r "dist/${{ github.name }}-${{ matrix.goos }}-${{ matrix.goarch }}.zip" "windows-latest/*"
+            7z a -r "dist/${{ github.name }}-${{ matrix.goos }}-${{ matrix.goarch }}.zip" "dist/*"
           } else {
-            tar -czvf "dist/${{ github.name }}-${{ matrix.goos }}-${{ matrix.goarch }}.tar.gz" "${{ runner.os }}"
+            tar -czvf "dist/${{ github.name }}-${{ matrix.goos }}-${{ matrix.goarch }}.tar.gz"  "${{ runner.os }}"
           }
       - name: Create Release
         id: create_release
