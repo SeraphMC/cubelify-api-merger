@@ -1,4 +1,4 @@
-name: Build and Release on Tag change
+name: Build and Release
 
 on:
   push:
@@ -11,9 +11,9 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ ubuntu-latest, windows-latest, macos-latest ]
-        goos: [ linux, windows, darwin ]
-        goarch: [ amd64 ]
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        goos: [linux, windows, darwin]
+        goarch: [amd64]
 
     steps:
       - name: Set up Go
@@ -27,7 +27,7 @@ jobs:
           fetch-depth: 0
 
       - name: Get dependencies
-        run: go get
+        run: go get -v ./...
 
       - name: Build
         env:
@@ -41,10 +41,23 @@ jobs:
           } else {
             tar -czvf "dist/${{ github.name }}-${{ matrix.goos }}-${{ matrix.goarch }}.tar.gz" "${{ runner.os }}"
           }
-      - name: Upload binaries to release
-        uses: svenstarck/upload-release-action@v2
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file_glob: dist/*
           tag_name: ${{ github.ref_name }}
-          overwrite: true
+          release_name: Release ${{ github.ref_name }}
+          draft: false
+          prerelease: false
+
+      - name: Upload binaries to release
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: dist/*
+          asset_name: ${{ github.name }}-${{ matrix.os }}-${{ matrix.goos }}-${{ matrix.goarch }}.${{ matrix.extension }}
+          asset_content_type: application/octet-stream
