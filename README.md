@@ -9,7 +9,7 @@ The application's behaviour is configured using a JSON file (e.g., `config.json`
 In the Cubelify overlay, simply paste this line in to your Custom API URL:
 
 ```text
-http://localhost:3000/merger?source={{source}}
+http://localhost:3000/merger?source={{source}}&id={{id}}&name={{name}}
 ```
 
 ### `config.json` Structure
