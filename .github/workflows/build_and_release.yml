@@ -1,18 +1,18 @@
-name: Build and Release
+Auto-build Go Projects on Multiple OSYou can automate the building, testing, and releasing of your Go projects on GitHub using GitHub Actions. GitHub Actions allows you to create custom workflows that are triggered by events in your GitHub repository. To build for all operating systems, you'll need to define a matrix strategy in your workflow.Here's how to set up an auto-build workflow for a Go project on multiple operating systems:1. Create a Workflow FileIn your Go project's repository, create a YAML file in the .github/workflows directory (e.g., release.yml). This file will define your workflow.2. Define the WorkflowHere's an updated example of a workflow file that builds a Go project on Ubuntu, Windows, and macOS:name: Build and Release
 
 on:
   push:
     branches:
-      - '*'
+      - '*' # Trigger on any push to any branch
 jobs:
   build:
     name: Build
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
-        goos: [linux, windows, darwin]
-        goarch: [amd64]
+        os: [ ubuntu-latest, windows-latest, macos-latest ]
+        goos: [ linux, windows, darwin ]
+        goarch: [ amd64 ]
         extension:
           - ""
           - ".exe"
@@ -38,7 +38,7 @@ jobs:
           GOARCH: ${{ matrix.goarch }}
           CGO_ENABLED: 0
         run: |
-          go build -v -o ${{ runner.os }}-${{ matrix.goos }}-${{ matrix.goarch }}/${{ github.name }}${{matrix.extension}} ./...
+          go build -v -o ${{ runner.os }}-${{ matrix.goos }}-${{ matrix.goarch }}/${{ github.name }}${{matrix.extension}} ./main.go
           mkdir dist
           if ($env:RUNNER_OS -eq "Windows") {
             7z a -r "dist/${{ github.name }}-${{ matrix.goos }}-${{ matrix.goarch }}.zip" "dist/*"
