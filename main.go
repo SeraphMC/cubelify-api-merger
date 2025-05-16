@@ -32,7 +32,7 @@ type APIConfig struct {
 var apiConfigs APIConfigs
 var apiConfigsMutex sync.RWMutex
 var configFile = "config.json"
-var mergeURL = "http://localhost:3000/merger?source={{source}}&id={{id}}&name={{name}}"
+var mergeURL = "http://localhost:3000/merger?sources={{sources}}&id={{id}}&name={{name}}"
 
 var seraphBanner = `
  ____                       _     
