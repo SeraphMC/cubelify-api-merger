@@ -75,7 +75,7 @@ func fetchData(customName, userAgent string, config APIConfig, requestParams map
 	}
 
 	startTime := time.Now()
-	err := request.ToJSON(apiResponse).CheckStatus(200).Fetch(context.Background())
+	err := request.ToJSON(apiResponse).UserAgent(userAgent).CheckStatus(200).Fetch(context.Background())
 	responseTime := time.Since(startTime)
 
 	if err != nil {
