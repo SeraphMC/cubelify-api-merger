@@ -1,6 +1,10 @@
-package main
+package src
 
 import "github.com/charmbracelet/bubbles/textinput"
+
+var (
+	mergeURL = "http://localhost:3000/merger?sources={{sources}}&id={{id}}&name={{name}}"
+)
 
 type APIConfigs map[string]APIConfig
 

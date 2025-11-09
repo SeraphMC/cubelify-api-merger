@@ -1,4 +1,4 @@
-package main
+package src
 
 import (
 	"fmt"
@@ -7,9 +7,38 @@ import (
 
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 )
 
-func initialMenuModel() MenuModel {
+var seraphBanner = `
+ ____                       _     
+/ ___|  ___ _ __ __ _ _ __ | |__  
+\___ \ / _ \ '__/ _' | '_ \| '_ \ 
+ ___) |  __/ | | (_| | |_) | | | |
+|____/ \___|_|  \__,_| .__/|_| |_| 
+                     |_|          
+`
+
+var (
+	primary    = lipgloss.Color("#6C8EEF")
+	secondary  = lipgloss.Color("#9ECBFF")
+	accent     = lipgloss.Color("#FFD787")
+	successCol = lipgloss.Color("#A6E3A1")
+	errorCol   = lipgloss.Color("#F38BA8")
+	textCol    = lipgloss.Color("#CDD6F4")
+	muted      = lipgloss.Color("#7F849C")
+
+	titleStyle     = lipgloss.NewStyle().Bold(true).Foreground(primary)
+	subtitleStyle  = lipgloss.NewStyle().Bold(true).Foreground(secondary)
+	normalStyle    = lipgloss.NewStyle().Foreground(textCol)
+	mutedStyle     = lipgloss.NewStyle().Foreground(muted).Italic(true)
+	highlightStyle = lipgloss.NewStyle().Bold(true).Foreground(accent)
+	successStyle   = lipgloss.NewStyle().Foreground(successCol)
+	errorStyle     = lipgloss.NewStyle().Foreground(errorCol)
+	infoStyle      = lipgloss.NewStyle().Foreground(secondary)
+)
+
+func InitialMenuModel() MenuModel {
 	return MenuModel{
 		Choices:      []string{"Add API", "View APIs", "Delete API", "Exit"},
 		URLCopied:    false,
@@ -33,7 +62,7 @@ func (m MenuModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "c", "C":
-			return m, copyToClipboard(mergeURL)
+			return m, CopyToClipboard(mergeURL)
 		case "up", "k":
 			if m.Cursor > 0 {
 				m.Cursor--
@@ -85,7 +114,7 @@ func (m MenuModel) View() string {
 
 func initialSelectionModel(mode string) SelectionModel {
 	return SelectionModel{
-		Items: getAPINames(),
+		Items: GetAPINames(),
 		Mode:  mode,
 	}
 }
@@ -107,16 +136,16 @@ func (m SelectionModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.Cursor++
 			}
 		case "esc":
-			return initialMenuModel(), nil
+			return InitialMenuModel(), nil
 		case "enter":
 			if m.Mode == "delete" && len(m.Items) > 0 {
 				name := m.Items[m.Cursor]
-				apiConfigsMutex.Lock()
-				delete(apiConfigs, name)
-				saveAPIConfigs(configFile, apiConfigs)
-				apiConfigsMutex.Unlock()
+				ApiConfigsMutex.Lock()
+				delete(ApiConfigs, name)
+				SaveAPIConfigs(ApiConfigs)
+				ApiConfigsMutex.Unlock()
 				m.Deleted = name
-				m.Items = getAPINames()
+				m.Items = GetAPINames()
 				if m.Cursor >= len(m.Items) {
 					m.Cursor = len(m.Items) - 1
 				}
@@ -154,9 +183,9 @@ func (m SelectionModel) View() string {
 			}
 			b.WriteString(style.Render(prefix+name) + "\n")
 			if m.Mode == "view" && m.Cursor == i {
-				apiConfigsMutex.RLock()
-				cfg := apiConfigs[name]
-				apiConfigsMutex.RUnlock()
+				ApiConfigsMutex.RLock()
+				cfg := ApiConfigs[name]
+				ApiConfigsMutex.RUnlock()
 				b.WriteString("    " + mutedStyle.Render(cfg.URL) + "\n")
 			}
 		}
@@ -197,7 +226,7 @@ func (m FormModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "esc":
-			return initialMenuModel(), nil
+			return InitialMenuModel(), nil
 		case "tab", "shift+tab", "up", "down", "enter":
 			if msg.String() == "enter" && m.Focus == len(m.Inputs)-1 {
 				name := strings.ReplaceAll(strings.TrimSpace(m.Inputs[0].Value()), " ", "-")
@@ -223,16 +252,20 @@ func (m FormModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					}
 				}
 
-				apiConfigsMutex.Lock()
-				apiConfigs[name] = APIConfig{
+				ApiConfigsMutex.Lock()
+				if ApiConfigs == nil {
+					ApiConfigs = make(APIConfigs)
+				}
+
+				ApiConfigs[name] = APIConfig{
 					URL:         fmt.Sprintf("%s://%s%s", parsed.Scheme, parsed.Host, parsed.Path),
 					Querystring: queryParams,
 				}
-				saveAPIConfigs(configFile, apiConfigs)
-				apiConfigsMutex.Unlock()
+				SaveAPIConfigs(ApiConfigs)
+				ApiConfigsMutex.Unlock()
 
 				m.Success = true
-				return initialMenuModel(), nil
+				return InitialMenuModel(), nil
 			}
 
 			if msg.String() == "up" || msg.String() == "shift+tab" {

@@ -4,56 +4,30 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"net/http"
 	"sync"
 	"time"
 
 	"github.com/SeraphMC/seraph-api-helpers/src/cubelify"
-	"github.com/atotto/clipboard"
 	"github.com/carlmjohnson/requests"
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/goccy/go-json"
 	"github.com/gofiber/fiber/v2"
-
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	"github.com/gofiber/fiber/v2/utils"
+	"seraph.si/v2/api-merger/src"
 )
 
-var (
-	apiConfigs      APIConfigs
-	apiConfigsMutex sync.RWMutex
-	configFile      = "config.json"
-	mergeURL        = "http://localhost:3000/merger?sources={{sources}}&id={{id}}&name={{name}}"
-)
+func fetchData(customName, userAgent string, config src.APIConfig, requestParams map[string]string, results chan<- *cubelify.CubelifyResponse, responseTimes chan<- time.Duration, errChan chan<- error, wg *sync.WaitGroup) {
+	defer func() {
+		wg.Done()
+		if r := recover(); r != nil {
+			log.Printf("Panic in fetchData for [%s]: %v", customName, r)
+		}
+	}()
 
-var seraphBanner = `
- ____                       _     
-/ ___|  ___ _ __ __ _ _ __ | |__  
-\___ \ / _ \ '__/ _' | '_ \| '_ \ 
- ___) |  __/ | | (_| | |_) | | | |
-|____/ \___|_|  \__,_| .__/|_| |_| 
-                     |_|          
-`
-
-var (
-	primary    = lipgloss.Color("#6C8EEF")
-	secondary  = lipgloss.Color("#9ECBFF")
-	accent     = lipgloss.Color("#FFD787")
-	successCol = lipgloss.Color("#A6E3A1")
-	errorCol   = lipgloss.Color("#F38BA8")
-	textCol    = lipgloss.Color("#CDD6F4")
-	muted      = lipgloss.Color("#7F849C")
-
-	titleStyle     = lipgloss.NewStyle().Bold(true).Foreground(primary)
-	subtitleStyle  = lipgloss.NewStyle().Bold(true).Foreground(secondary)
-	normalStyle    = lipgloss.NewStyle().Foreground(textCol)
-	mutedStyle     = lipgloss.NewStyle().Foreground(muted).Italic(true)
-	highlightStyle = lipgloss.NewStyle().Bold(true).Foreground(accent)
-	successStyle   = lipgloss.NewStyle().Foreground(successCol)
-	errorStyle     = lipgloss.NewStyle().Foreground(errorCol)
-	infoStyle      = lipgloss.NewStyle().Foreground(secondary)
-)
-
-func fetchData(customName, userAgent string, config APIConfig, requestParams map[string]string, results chan<- cubelify.CubelifyResponse, responseTimes chan<- time.Duration, errChan chan<- error, wg *sync.WaitGroup) {
-	defer wg.Done()
+	client := &http.Client{
+		Timeout: 5 * time.Second,
+	}
 
 	apiResponse := new(cubelify.CubelifyResponse)
 	request := requests.URL(config.URL)
@@ -75,7 +49,7 @@ func fetchData(customName, userAgent string, config APIConfig, requestParams map
 	}
 
 	startTime := time.Now()
-	err := request.ToJSON(apiResponse).UserAgent(userAgent).CheckStatus(200).Fetch(context.Background())
+	err := request.ToJSON(apiResponse).Client(client).UserAgent(userAgent).CheckStatus(200).Fetch(context.Background())
 	responseTime := time.Since(startTime)
 
 	if err != nil {
@@ -83,25 +57,18 @@ func fetchData(customName, userAgent string, config APIConfig, requestParams map
 		return
 	}
 
-	results <- *apiResponse
+	results <- apiResponse
 	responseTimes <- responseTime
 }
 
-func copyToClipboard(s string) tea.Cmd {
-	return func() tea.Msg {
-		err := clipboard.WriteAll(s)
-		return ClipboardMsg{Success: err == nil, Err: err}
+func init() {
+	_, err := src.ReadAPIConfigs()
+	if err != nil {
+		log.Fatal(err)
 	}
 }
 
 func main() {
-	var err error
-	apiConfigs, err = readAPIConfigs(configFile)
-	if err != nil {
-		fmt.Println("Error reading config:", err)
-		apiConfigs = make(APIConfigs)
-	}
-
 	app := fiber.New(fiber.Config{
 		AppName:               "API Merger by Seraph",
 		GETOnly:               true,
@@ -112,34 +79,49 @@ func main() {
 
 	app.Get("/merger", func(c *fiber.Ctx) error {
 		var wg sync.WaitGroup
-		results := make(chan cubelify.CubelifyResponse, len(apiConfigs))
-		responseTimes := make(chan time.Duration, len(apiConfigs))
-		errChan := make(chan error, len(apiConfigs))
+		results := make(chan *cubelify.CubelifyResponse, len(src.ApiConfigs))
+		responseTimes := make(chan time.Duration, len(src.ApiConfigs))
+		errChan := make(chan error, len(src.ApiConfigs))
 
 		requestParams := make(map[string]string)
-		c.Request().URI().QueryArgs().VisitAll(func(key, value []byte) {
-			requestParams[string(key)] = string(value)
-		})
-		userAgent := c.Get("User-Agent")
 
-		apiConfigsMutex.RLock()
-		for name, config := range apiConfigs {
+		for key, value := range c.Request().URI().QueryArgs().All() {
+			requestParams[string(key)] = string(value)
+		}
+		userAgent := utils.CopyString(c.Get("User-Agent"))
+
+		src.ApiConfigsMutex.RLock()
+		for name, config := range src.ApiConfigs {
 			wg.Add(1)
 			go fetchData(name, userAgent, config, requestParams, results, responseTimes, errChan, &wg)
 		}
-		apiConfigsMutex.RUnlock()
+		src.ApiConfigsMutex.RUnlock()
+
+		var fetchErrors []error
+		for len(errChan) > 0 {
+			select {
+			case err := <-errChan:
+				fetchErrors = append(fetchErrors, err)
+			default:
+				break
+			}
+		}
 
 		wg.Wait()
 		close(results)
 		close(responseTimes)
 		close(errChan)
 
-		for err := range errChan {
-			log.Println("Fetch error:", err)
+		for _, err := range fetchErrors {
+			log.Println("Error fetching from API:", err)
 		}
 
 		builder := cubelify.NewCubelifyResponseBuilder()
 		for result := range results {
+			if result == nil {
+				continue
+			}
+
 			if result.Tags != nil {
 				builder.AddTags(*result.Tags)
 			}
@@ -157,7 +139,7 @@ func main() {
 		}
 	}()
 
-	if _, err := tea.NewProgram(initialMenuModel(), tea.WithAltScreen()).Run(); err != nil {
+	if _, err := tea.NewProgram(src.InitialMenuModel(), tea.WithAltScreen()).Run(); err != nil {
 		log.Fatalf("TUI error: %v", err)
 	}
 
