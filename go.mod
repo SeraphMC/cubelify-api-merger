@@ -1,6 +1,6 @@
 module seraph.si/v2/api-merger
 
-go 1.25.3
+go 1.25.5
 
 require (
 	github.com/SeraphMC/seraph-api-helpers v0.0.0-20251029015034-c435b034ef00
