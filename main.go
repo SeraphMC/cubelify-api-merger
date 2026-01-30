@@ -14,6 +14,7 @@ import (
 	"github.com/goccy/go-json"
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/utils"
+
 	"seraph.si/v2/api-merger/src"
 )
 
@@ -125,7 +126,7 @@ func main() {
 			if result.Tags != nil {
 				builder.AddTags(*result.Tags)
 			}
-			if result.Score != nil {
+			if result.Score != nil && result.Score.Value != 0 {
 				builder.AddSniperScore(result.Score)
 			}
 		}
